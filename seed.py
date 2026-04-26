@@ -10,7 +10,7 @@ cars = [
 ]
 
 for car in cars:
-    response = requests.post("http://localhost:8000/cars", json=car)
+    response = requests.post("https://driverex-backend.onrender.com/cars", json=car)
     print(f"Added: {car['name']} → {response.status_code}")
 
 print("Done! All cars added to database.")
