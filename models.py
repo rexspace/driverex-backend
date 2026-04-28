@@ -1,5 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float
-from database import Base
+from sqlalchemy.orm import DeclarativeBase
+
+class Base(DeclarativeBase):
+    pass
 
 class Car(Base):
     __tablename__ = "cars"
@@ -14,7 +17,6 @@ class Car(Base):
     emoji = Column(String, nullable=False)
     badge = Column(String, nullable=False)
     image_url = Column(String, nullable=True)
-
 
 class Booking(Base):
     __tablename__ = "bookings"
