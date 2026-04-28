@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import Optional
 from database import get_db, engine
 from auth import hash_password, verify_password, create_access_token, verify_token
 import models
@@ -16,13 +17,14 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:3000",
+        "https://bright-hotteok-326878.netlify.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Pydantic schemas — define what data looks like coming in
+# Pydantic schemas
 class CarCreate(BaseModel):
     name: str
     type: str
@@ -32,7 +34,7 @@ class CarCreate(BaseModel):
     trips: int
     emoji: str
     badge: str
-    image_url: str = None
+    image_url: Optional[str] = None
 
 class BookingCreate(BaseModel):
     car_id: int
@@ -41,6 +43,15 @@ class BookingCreate(BaseModel):
     pickup_date: str
     return_date: str
     total_price: int
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
 
 # ─── CAR ENDPOINTS ───────────────────────────────────────
 
@@ -62,7 +73,17 @@ def get_car(car_id: int, db: Session = Depends(get_db)):
 
 @app.post("/cars")
 def create_car(car: CarCreate, db: Session = Depends(get_db)):
-    new_car = models.Car(**car.dict())
+    new_car = models.Car(
+        name=car.name,
+        type=car.type,
+        seats=car.seats,
+        price=car.price,
+        rating=car.rating,
+        trips=car.trips,
+        emoji=car.emoji,
+        badge=car.badge,
+        image_url=car.image_url,
+    )
     db.add(new_car)
     db.commit()
     db.refresh(new_car)
@@ -77,6 +98,24 @@ def delete_car(car_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Car deleted"}
 
+@app.put("/cars/{car_id}")
+def update_car(car_id: int, car: CarCreate, db: Session = Depends(get_db)):
+    db_car = db.query(models.Car).filter(models.Car.id == car_id).first()
+    if not db_car:
+        raise HTTPException(status_code=404, detail="Car not found")
+    db_car.name = car.name
+    db_car.type = car.type
+    db_car.seats = car.seats
+    db_car.price = car.price
+    db_car.rating = car.rating
+    db_car.trips = car.trips
+    db_car.emoji = car.emoji
+    db_car.badge = car.badge
+    db_car.image_url = car.image_url
+    db.commit()
+    db.refresh(db_car)
+    return db_car
+
 # ─── BOOKING ENDPOINTS ───────────────────────────────────
 
 @app.get("/bookings")
@@ -86,7 +125,14 @@ def get_bookings(db: Session = Depends(get_db)):
 
 @app.post("/bookings")
 def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
-    new_booking = models.Booking(**booking.dict())
+    new_booking = models.Booking(
+        car_id=booking.car_id,
+        customer_name=booking.customer_name,
+        customer_email=booking.customer_email,
+        pickup_date=booking.pickup_date,
+        return_date=booking.return_date,
+        total_price=booking.total_price,
+    )
     db.add(new_booking)
     db.commit()
     db.refresh(new_booking)
@@ -94,23 +140,11 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
 
 # ─── AUTH ENDPOINTS ──────────────────────────────────────
 
-class UserCreate(BaseModel):
-    name: str
-    email: str
-    password: str
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
-
 @app.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
-    # Check if email already exists
     existing = db.query(models.User).filter(models.User.email == user.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Hash the password before saving
     hashed = hash_password(user.password)
     new_user = models.User(
         name=user.name,
@@ -124,16 +158,11 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
-    # Find user by email
     db_user = db.query(models.User).filter(models.User.email == user.email).first()
     if not db_user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    # Check password
     if not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    # Create and return token
     token = create_access_token({"sub": db_user.email, "name": db_user.name})
     return {
         "token": token,
@@ -148,6 +177,8 @@ def get_me(token: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid token")
     user = db.query(models.User).filter(models.User.email == email).first()
     return {"name": user.name, "email": user.email}
+
+# ─── ADMIN ENDPOINTS ─────────────────────────────────────
 
 @app.get("/admin/stats")
 def get_stats(db: Session = Depends(get_db)):
@@ -181,21 +212,3 @@ def get_all_bookings(db: Session = Depends(get_db)):
             "status": b.status,
         })
     return result
-
-@app.put("/cars/{car_id}")
-def update_car(car_id: int, car: CarCreate, db: Session = Depends(get_db)):
-    db_car = db.query(models.Car).filter(models.Car.id == car_id).first()
-    if not car:
-        raise HTTPException(status_code=404, detail="Car not found")
-    db_car.name = car.name
-    db_car.type = car.type
-    db_car.seats = car.seats
-    db_car.price = car.price
-    db_car.rating = car.rating
-    db_car.trips = car.trips
-    db_car.emoji = car.emoji
-    db_car.badge = car.badge
-    db_car.image_url = car.image_url
-    db.commit()
-    db.refresh(db_car)
-    return db_car
