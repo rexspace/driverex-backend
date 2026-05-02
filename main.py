@@ -20,6 +20,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://bright-hotteok-326878.netlify.app",
+        "https://bright-hotteok-326878.netlify.app/",
     ],
     allow_credentials=True,
     allow_methods=["*"],
