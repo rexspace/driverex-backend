@@ -6,8 +6,10 @@ from typing import Optional
 from database import get_db, engine
 from auth import hash_password, verify_password, create_access_token, verify_token
 import models
+import resend
+import os
+import secrets
 
-# Create all database tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -24,7 +26,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pydantic schemas
+resend.api_key = os.getenv("RESEND_API_KEY")
+
+def send_verification_email(email: str, name: str, token: str):
+    verification_url = f"https://driverex-backend.onrender.com/verify-email?token={token}"
+    resend.Emails.send({
+        "from": "DriveRex <onboarding@resend.dev>",
+        "to": email,
+        "subject": "Verify your DriveRex account",
+        "html": f"""
+        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 40px;">
+            <h1 style="color: #0a0a0a;">Welcome to Drive<span style="color: #2563eb;">Rex</span>, {name}! 🎉</h1>
+            <p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
+                You're almost ready to start renting premium cars. 
+                Just click the button below to verify your email address.
+            </p>
+            <a href="{verification_url}" 
+               style="display: inline-block; background: #2563eb; color: white; 
+                      padding: 14px 28px; border-radius: 10px; text-decoration: none; 
+                      font-weight: 600; font-size: 15px; margin: 24px 0;">
+                Verify my email →
+            </a>
+            <p style="color: #9ca3af; font-size: 13px;">
+                If you didn't create a DriveRex account, ignore this email.
+            </p>
+            <hr style="border: none; border-top: 1px solid #f0f0f0; margin: 24px 0;">
+            <p style="color: #9ca3af; font-size: 12px;">© 2026 DriveRex. Made in Nigeria 🇳🇬</p>
+        </div>
+        """
+    })
+
 class CarCreate(BaseModel):
     name: str
     type: str
@@ -53,16 +84,13 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-# ─── CAR ENDPOINTS ───────────────────────────────────────
-
 @app.get("/")
 def home():
     return {"message": "Welcome to DriveRex API!"}
 
 @app.get("/cars")
 def get_cars(db: Session = Depends(get_db)):
-    cars = db.query(models.Car).all()
-    return cars
+    return db.query(models.Car).all()
 
 @app.get("/cars/{car_id}")
 def get_car(car_id: int, db: Session = Depends(get_db)):
@@ -116,12 +144,9 @@ def update_car(car_id: int, car: CarCreate, db: Session = Depends(get_db)):
     db.refresh(db_car)
     return db_car
 
-# ─── BOOKING ENDPOINTS ───────────────────────────────────
-
 @app.get("/bookings")
 def get_bookings(db: Session = Depends(get_db)):
-    bookings = db.query(models.Booking).all()
-    return bookings
+    return db.query(models.Booking).all()
 
 @app.post("/bookings")
 def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
@@ -138,23 +163,38 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
     db.refresh(new_booking)
     return new_booking
 
-# ─── AUTH ENDPOINTS ──────────────────────────────────────
-
 @app.post("/signup")
 def signup(user: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(models.User).filter(models.User.email == user.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed = hash_password(user.password)
+    token = secrets.token_urlsafe(32)
     new_user = models.User(
         name=user.name,
         email=user.email,
-        hashed_password=hashed
+        hashed_password=hashed,
+        is_verified=False,
+        verification_token=token,
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"message": "Account created successfully", "name": new_user.name}
+    try:
+        send_verification_email(user.email, user.name, token)
+    except Exception as e:
+        print(f"Email error: {e}")
+    return {"message": "Account created! Please check your email to verify.", "name": new_user.name}
+
+@app.get("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.verification_token == token).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid verification token")
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    return {"message": "Email verified successfully! You can now login."}
 
 @app.post("/login")
 def login(user: UserLogin, db: Session = Depends(get_db)):
@@ -163,12 +203,10 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not verify_password(user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not db_user.is_verified:
+        raise HTTPException(status_code=401, detail="Please verify your email before logging in")
     token = create_access_token({"sub": db_user.email, "name": db_user.name})
-    return {
-        "token": token,
-        "name": db_user.name,
-        "email": db_user.email
-    }
+    return {"token": token, "name": db_user.name, "email": db_user.email}
 
 @app.get("/me")
 def get_me(token: str, db: Session = Depends(get_db)):
@@ -177,8 +215,6 @@ def get_me(token: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid token")
     user = db.query(models.User).filter(models.User.email == email).first()
     return {"name": user.name, "email": user.email}
-
-# ─── ADMIN ENDPOINTS ─────────────────────────────────────
 
 @app.get("/admin/stats")
 def get_stats(db: Session = Depends(get_db)):

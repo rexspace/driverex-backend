@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, Boolean
 from database import Base
 
 class Car(Base):
@@ -32,3 +32,5 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_admin = Column(String, default="false")
+    is_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
