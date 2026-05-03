@@ -170,7 +170,7 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
         name=user.name,
         email=user.email,
         hashed_password=hashed,
-        is_verified=False,
+        is_verified=True,
         verification_token=token,
     )
     db.add(new_user)
