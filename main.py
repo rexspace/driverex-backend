@@ -176,12 +176,20 @@ def signup(user: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    # Send email in background - don't let it crash signup
     try:
-        send_verification_email(user.email, user.name, token)
+        if os.getenv("RESEND_API_KEY"):
+            send_verification_email(user.email, user.name, token)
     except Exception as e:
-        print(f"Email error: {e}")
-    return {"message": "Account created! Please check your email to verify.", "name": new_user.name}
-
+        print(f"Email sending failed: {e}")
+        # Continue anyway - user account is created
+    
+    return {
+        "message": "Account created! Please check your email to verify.", 
+        "name": new_user.name,
+        "token": token  # temporary - for testing
+    }
 @app.get("/verify-email")
 def verify_email(token: str, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.verification_token == token).first()
