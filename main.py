@@ -159,23 +159,22 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
     db.refresh(new_booking)
     return new_booking
 
-@app.post("/signup")
-def signup(user: UserCreate, db: Session = Depends(get_db)):
-    existing = db.query(models.User).filter(models.User.email == user.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    hashed = hash_password(user.password)
-    token = secrets.token_urlsafe(32)
-    new_user = models.User(
-        name=user.name,
-        email=user.email,
-        hashed_password=hashed,
-        is_verified=True,
-        verification_token=token,
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    #@app.post("/signup")
+    #def signup(user: UserCreate, db: Session = Depends(get_db)):
+        #existing = db.query(models.User).filter(models.User.email == user.email).first()
+        #if existing:
+        #    raise HTTPException(status_code=400, detail="Email already registered")
+        #hashed = hash_password(user.password)
+        #token = secrets.token_urlsafe(32)
+        #new_user = models.User(
+         #   name=user.name,
+          #  email=user.email,
+           # hashed_password=hashed,
+            #is_verified=True,
+            #verification_token=token,)
+        #db.add(new_user)
+        #db.commit()
+        #db.refresh(new_user)
     
     # Send email in background - don't let it crash signup
     try:
