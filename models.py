@@ -24,6 +24,25 @@ class Booking(Base):
     return_date = Column(String, nullable=False)
     total_price = Column(Integer, nullable=False)
     status = Column(String, default="pending")
+    phone_number = Column(String)
+    home_address = Column(String)
+    city = Column(String)
+    state = Column(String)
+    country = Column(String, default="Nigeria")
+
+    has_license = Column(Boolean, default=False)
+    license_number = Column(String, nullable=True)
+    license_expiry = Column(String, nullable=True)
+    license_image = Column(String, nullable=True)
+
+    needs_driver = Column(Boolean, default=False)
+
+    nin = Column(String, nullable=True)
+
+    emergency_contact_name = Column(String)
+    emergency_contact_phone = Column(String)
+
+    booking_status = Column(String, default="pending")
 
 class User(Base):
     __tablename__ = "users"

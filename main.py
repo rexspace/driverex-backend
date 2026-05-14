@@ -39,6 +39,23 @@ class BookingCreate(BaseModel):
     pickup_date: str
     return_date: str
     total_price: int
+    phone_number: str
+    home_address: str
+    city: str
+    state: str
+    country: str = "Nigeria"
+    has_license: bool = False
+    license_number: Optional[str] = None
+    license_expiry: Optional[str] = None
+    license_image: Optional[str] = None
+    needs_driver: bool = False
+
+    nin: Optional[str] = None
+
+    emergency_contact_name: str
+    emergency_contact_phone: str
+
+    booking_status: str = "pending" 
 
 class UserCreate(BaseModel):
     name: str
