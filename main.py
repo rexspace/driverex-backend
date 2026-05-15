@@ -143,6 +143,18 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
         pickup_date=booking.pickup_date,
         return_date=booking.return_date,
         total_price=booking.total_price,
+         phone_number=booking.phone_number,
+        home_address=booking.home_address,
+        state=booking.state,
+
+        has_license=booking.has_license,
+        license_number=booking.license_number,
+        license_expiry=booking.license_expiry,
+
+        needs_driver=booking.needs_driver,
+
+        emergency_contact_name=booking.emergency_contact_name,
+        emergency_contact_phone=booking.emergency_contact_pho
     )
     db.add(new_booking)
     db.commit()
