@@ -218,7 +218,25 @@ def get_stats(db: Session = Depends(get_db)):
         "total_users": total_users,
         "total_revenue": total_revenue,
     }
-
+@app.get("/my-bookings")
+def get_my_bookings(email: str, db: Session = Depends(get_db)):
+    bookings = db.query(models.Booking).filter(
+        models.Booking.customer_email == email
+    ).all()
+    result = []
+    for b in bookings:
+        car = db.query(models.Car).filter(models.Car.id == b.car_id).first()
+        result.append({
+            "id": b.id,
+            "car_name": car.name if car else "Unknown",
+            "car_emoji": car.emoji if car else "🚗",
+            "car_image": car.image_url if car else None,
+            "pickup_date": b.pickup_date,
+            "return_date": b.return_date,
+            "total_price": b.total_price,
+            "status": b.status,
+        })
+    return result
 @app.get("/admin/bookings")
 def get_all_bookings(db: Session = Depends(get_db)):
     bookings = db.query(models.Booking).all()
