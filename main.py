@@ -195,7 +195,12 @@ def login(user: UserLogin, db: Session = Depends(get_db)):
     if not db_user.is_verified:
         raise HTTPException(status_code=401, detail="Please verify your email before logging in")
     token = create_access_token({"sub": db_user.email, "name": db_user.name})
-    return {"token": token, "name": db_user.name, "email": db_user.email}
+    return {
+        "token": token,
+        "name": db_user.name,
+        "email": db_user.email,
+        "is_admin": db_user.is_admin
+    }
 
 @app.get("/me")
 def get_me(token: str, db: Session = Depends(get_db)):
