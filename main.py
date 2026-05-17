@@ -64,6 +64,8 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+class BookingStatusUpdate(BaseModel):
+    status: str
 
 @app.get("/")
 def home():
@@ -260,3 +262,12 @@ def get_all_bookings(db: Session = Depends(get_db)):
             "status": b.status,
         })
     return result
+@app.put("/bookings/{booking_id}/status")
+def update_booking_status(booking_id: int, update: BookingStatusUpdate, db: Session = Depends(get_db)):
+    booking = db.query(models.Booking).filter(models.Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    booking.status = update.status
+    db.commit()
+    db.refresh(booking)
+    return {"message": f"Booking status updated to {update.status}", "id": booking.id, "status": booking.status}
